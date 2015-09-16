@@ -3,3 +3,4 @@ env/
 *.pyc
 meetupslackers.log
 config.conf
+.env
