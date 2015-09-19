@@ -1,13 +1,12 @@
 # KD MeetupSlackers
 # (Originally forked from awesinine/meetup-slack)
 #
+# Authors: Awesinine, Marviel (Luke Bechtel)
 
 import requests, json, time, csv, logging, os, re
 from datetime import datetime, timedelta
 
-interval = 1 # in days
-
-interval_hr = 27
+interval_hr = 24
 interval_td = timedelta(hours=interval_hr)
 
 class meetupslackers(object):
@@ -17,7 +16,6 @@ class meetupslackers(object):
     self.http_webhook = os.environ['slack_webhook_dev']
     self.begin = datetime.now()
     self.end = datetime.now() + interval_td
-    self.meetupJson = self.loadMeetup()
     self.json_keys = ['name','how_to_find_us','maybe_rsvp_count','headcount','waitlist_count','time','yes_rsvp_count','id','visibility','updated','rsvp_limit','created','description','event_url','utc_offset','status','group','venue']
     self.json_group = ['who', 'name', 'group_lat', 'created','join_mode','group_lon', 'urlname', 'id']
     self.json_venue = ['city','name','zip','country','lon','state','address_1','repinned','lat','id']
@@ -53,24 +51,30 @@ class meetupslackers(object):
 
     return payload
 
-  #Snags the meetup api info as JSON 
-  def loadMeetup(self): 
-    logging.info("loadMeetup called")
-    # next version
-    beginSecondsSinceEpoch = time.mktime(self.begin.timetuple())
-    endSecondsSinceEpoch = time.mktime(self.end.timetuple())
+  #Requests meetup info from api
+  def requestMeetups(self, begin, end): 
+    logging.info("loadMeetups called")
 
     base_req = os.environ['meetup_api']
-    req = '{0}&time=-1d,{1}d'.format(base_req, str(interval))
-    # next version
-    req_v2 = base_req + '&time=' + str(int(beginSecondsSinceEpoch) * 1000) + ',' + str(int(endSecondsSinceEpoch) * 1000)
-    print(req_v2)
-    r = requests.get(req_v2)
+
+    req = base_req + '&time=' + str(int(begin) * 1000) + ',' + str(int(end) * 1000)
+    print(req)
+    r = requests.get(req)
     if r.status_code >= 400:
       print("error trying to get meetups!")
       quit()
-    print(str(r.json()))
-    return r.json()
+    return r
+
+  #Loads meetups from api into object json
+  def loadMeetups(self):
+    beginSecondsSinceEpoch = time.mktime(self.begin.timetuple())
+    endSecondsSinceEpoch = time.mktime(self.end.timetuple())
+
+    ret = self.requestMeetups(beginSecondsSinceEpoch,endSecondsSinceEpoch)
+    self.meetupJson = ret.json()
+
+    print(str(self.meetupJson))
+    return self.meetupJson
 
   # really really really ugly json parsing, this was a first draft and a candidate for reworking asap
   # the basic gist is that it flattens out the json events with the relevant keys we need for the slack announcement
@@ -142,9 +146,14 @@ class meetupslackers(object):
     emoji = ":meetup:"
     message_add = "test"
     for count in range(len(events)):
-      # r = requests.post(self.http_webhook, data=json.dumps(self.formatSlackMessage(events[count], botname, emoji, message_add)))
+      r = requests.post(self.http_webhook, data=json.dumps(self.formatSlackMessage(events[count], botname, emoji, message_add)))
       continue
 
 if __name__ == '__main__':
   meetupIntegration = meetupslackers()
-  meetupIntegration.announce(meetupIntegration.parseJson(meetupIntegration.json_keys, meetupIntegration.json_group, meetupIntegration.json_venue))
+  while(True):
+    meetupIntegration.loadMeetups()
+    meetupIntegration.announce(meetupIntegration.parseJson(meetupIntegration.json_keys, meetupIntegration.json_group, meetupIntegration.json_venue))
+    s = interval_td.total_seconds()
+    print("s is: " + str(s))
+    time.sleep(s)
