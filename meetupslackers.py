@@ -6,8 +6,17 @@
 import requests, json, time, csv, logging, os, re
 from datetime import datetime, timedelta
 
-interval_hr = 24
+interval_hr = 128
 interval_td = timedelta(hours=interval_hr)
+default_descrip = "Another knoxville event!"
+
+class Meetup(object):
+  def __init__(self):
+    None
+
+class MeetupGroup(object):
+  def __init__(self):
+    None
 
 class meetupslackers(object):
   def __init__(self): 
@@ -34,8 +43,10 @@ class meetupslackers(object):
     return payload
 
   #this is the meetup slack message, formated to look all nice and shit: huge candidate for cleanup
-  def formatSlackMessage(self, event, botname, emoji, message_add):
+  def formatSlackMessage(self, event, emoji, message_add, botname=None):
     logging.info("formatSlackMessage")
+
+    botname = botname if botname is not None else event['group']['name']
     spacer = "\t\t"
     eventNameLink = "<" + event['event_url'] + "|" + event['name'] + ">"
     map = ":pushpin:" + spacer + "<" + "https://www.google.com/maps/dir//" + (event['venue_address_1']).replace(" ", "+") + "+" + (event['venue_city']).replace(" ", "+") + "+" + (event['venue_state']).replace(" ", "+") + "+" + (event['venue_zip']).replace(" ", "+") + "|" + event['venue_name'] + ">"
@@ -106,7 +117,7 @@ class meetupslackers(object):
       ######If something is missing then we populate it with some known values so that the slack message
       ######handler can populate it with something friendly instead of garbage
       ######Is there a better way to do this???
-
+      returnDict['group'] = meetupJson['results'][eventCount]['group']
       returnDict['event_url'] = meetupJson['results'][eventCount]['event_url']
       returnDict['name'] = meetupJson['results'][eventCount]['name']
       returnDict['yes_rsvp_count'] = meetupJson['results'][eventCount]['yes_rsvp_count']
@@ -114,7 +125,7 @@ class meetupslackers(object):
         returnDict['description'] = meetupJson['results'][eventCount]['description']
       except:
         logging.warning("description wasn't found")
-        returnDict['description'] = "Learn to Code LA presents another learning event!"
+        returnDict['description'] = default_descrip
       try:                                  #gotta mark events that don't have a time with a special value so they don't get announced
         returnDict['waitlist_count'] = meetupJson['results'][eventCount]['waitlist_count'] 
       except:
@@ -142,11 +153,13 @@ class meetupslackers(object):
   ##events is a list, message is a test message
   def announce(self, events): 
     #logging.info("announcing events")
-    botname ="meetup"
+    botname = None
+    #botname ="meetup"
     emoji = ":meetup:"
+    #botname = "Incoming Meetup!"
     message_add = "test"
     for count in range(len(events)):
-      r = requests.post(self.http_webhook, data=json.dumps(self.formatSlackMessage(events[count], botname, emoji, message_add)))
+      r = requests.post(self.http_webhook, data=json.dumps(self.formatSlackMessage(events[count], emoji, message_add, botname=botname)))
       continue
 
 if __name__ == '__main__':
